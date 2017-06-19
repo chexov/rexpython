@@ -2,10 +2,10 @@ from distutils.core import setup
 
 setup(
     name='rexpython',
-    version='0.1.0',
+    version='0.1.2',
     author='Anton P. Linevich',
     author_email='anton@linevich.com',
-    packages=['rexpython',],
+    packages=['rexpython', ],
     scripts=[],
     url='http://pypi.python.org/pypi/rexpython/',
     license='LICENSE.txt',

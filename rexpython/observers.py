@@ -4,7 +4,7 @@ import traceback
 from abc import ABCMeta, abstractmethod
 from multiprocessing import queues
 
-from rex import Disposable, ON_ERROR, THROW_IF_FATAL
+from . import Disposable, ON_ERROR, THROW_IF_FATAL
 from utils import CountDownLatch
 
 log = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 from observers import Observer
-from rex import ON_ERROR, EMPTY_ACTION
 from . import Disposable, EMPTY_CONSUMER
+from . import ON_ERROR, EMPTY_ACTION
 from .observers import SingleObserver
 
 

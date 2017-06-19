@@ -1,7 +1,7 @@
 import sys
 import time
 
-from rex import Observable, LambdaObserver, ActionDisposable, Disposable
+from rexpython import Observable, LambdaObserver, ActionDisposable, Disposable
 
 if __name__ == '__main__':
     Observable.from_(xrange(1, 4)).subscribe(LambdaObserver(
