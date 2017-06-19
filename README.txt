@@ -2,7 +2,8 @@
 RexPython
 =========
 
-This is python Rx implementation mimicing RxJava API as far as it can.
+This is Reactive Extensions (Rx) for Python implementation mimicing RxJava2 API as far as it can.
+It is LINQ free btw. The goal to make it hackable on the go.
 
 
 Installation
