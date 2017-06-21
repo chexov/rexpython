@@ -5,6 +5,8 @@ RexPython
 This is Reactive Extensions (Rx) for Python implementation mimicing RxJava2 API as far as it can.
 It is LINQ free btw. The goal to make it hackable on the go.
 
+https://github.com/chexov/rexpython
+
 
 Installation
 ============
