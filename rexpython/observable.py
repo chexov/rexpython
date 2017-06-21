@@ -64,6 +64,7 @@ class ObservableBlockingSubscribe(object):
         source.subscribe(bs)
 
         while not bs.isDisposed():
+            v = None
             try:
                 v = queue.get(timeout=1)
             except queues.Empty:
