@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='rexpython',
-    version='0.1.4',
+    version='0.1.5',
     author='Anton P. Linevich',
     author_email='anton@linevich.com',
     packages=['rexpython', ],
