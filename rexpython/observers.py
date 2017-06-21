@@ -131,3 +131,37 @@ class BlockingMultiObserver(SingleObserver, CountDownLatch):
             pass
 
         return self.value.get(timeout=1.)
+
+
+class BlockingObserver(Observer, Disposable):
+    COMPLETE = "::COMPLETE"
+    TERMINATED = "::TERMINATED"
+
+    def __init__(self, queue):
+        """
+
+        :type queue: queues.Queue
+        """
+        self.queue = queue
+        self.d = None
+
+    def isDisposed(self):
+        return self.d is None
+
+    def onError(self, err):
+        self.queue.put(err)
+
+    def dispose(self):
+        if self.d is not None:
+            self.d.dispose()
+            self.queue.put(BlockingObserver.TERMINATED)
+            self.d = None
+
+    def onNext(self, t):
+        self.queue.put(t)
+
+    def onSubscribe(self, disposable):
+        self.d = disposable
+
+    def onComplete(self):
+        self.queue.put(BlockingObserver.COMPLETE)

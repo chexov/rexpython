@@ -5,7 +5,9 @@ from abc import ABCMeta, abstractmethod
 from singles import Single
 from . import Emitter, EMPTY_ACTION, Disposable, EMPTY_CONSUMER, THROW_IF_FATAL
 from .helpers import LambdaObserver
-from .observers import Observer, BasicObserver, SingleObserver
+from .observers import Observer, BasicObserver, SingleObserver, BlockingObserver
+
+from multiprocessing import queues
 
 
 class ObservableSource(object):
@@ -30,6 +32,45 @@ class ObservableEmitter(Emitter):
     @abstractmethod
     def isDisposed(self):
         raise RuntimeError("unimplemented")
+
+
+def acceptFull(v, observer):
+    if v == BlockingObserver.COMPLETE:
+        observer.onComplete()
+        return True
+    elif isinstance(v, Exception):
+        observer.onError(v)
+        return True
+    observer.onNext(v)
+    return False
+
+
+class ObservableBlockingSubscribe(object):
+    @staticmethod
+    def subscribe(source, observer):
+        """
+
+        :type observer: Observer
+        :type source: ObservableSource
+        """
+        assert isinstance(source, ObservableSource), "source must be ObservableSource but %s" % type(source)
+        assert isinstance(observer, Observer), "observer must be Observer but %s" % type(observer)
+
+        queue = queues.Queue()
+
+        bs = BlockingObserver(queue)
+        observer.onSubscribe(bs)
+
+        source.subscribe(bs)
+
+        while not bs.isDisposed():
+            try:
+                v = queue.get(timeout=1)
+            except queues.Empty:
+                pass
+
+            if bs.isDisposed() or v == BlockingObserver.TERMINATED or acceptFull(v, observer):
+                break
 
 
 class Observable(ObservableSource):
@@ -59,6 +100,9 @@ class Observable(ObservableSource):
     def subscribe(self, observer):
         assert isinstance(observer, Observer)
         observer.onSubscribe(self)
+
+    def blockingSubscribe(self, on_next=EMPTY_CONSUMER, on_error=EMPTY_CONSUMER, on_complete=EMPTY_ACTION):
+        return ObservableBlockingSubscribe.subscribe(self, LambdaObserver(on_next, on_error, on_complete))
 
     def map(self, func):
         return ObservableMap(self, func)
