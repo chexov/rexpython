@@ -1,13 +1,18 @@
 import collections
+import multiprocessing
 import sys
 from abc import ABCMeta, abstractmethod
+from multiprocessing import queues
+
+import logging
 
 from singles import Single
 from . import Emitter, EMPTY_ACTION, Disposable, EMPTY_CONSUMER, THROW_IF_FATAL
 from .helpers import LambdaObserver
 from .observers import Observer, BasicObserver, SingleObserver, BlockingObserver
 
-from multiprocessing import queues
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class ObservableSource(object):
@@ -68,10 +73,37 @@ class ObservableBlockingSubscribe(object):
             try:
                 v = queue.get(timeout=1)
             except queues.Empty:
-                pass
+                continue
+
+            if v is None:
+                bs.dispose()
+                observer.onComplete()
+                break
 
             if bs.isDisposed() or v == BlockingObserver.TERMINATED or acceptFull(v, observer):
                 break
+
+
+class DisposeTask(Disposable, multiprocessing.Process):
+    def __init__(self, action):
+        """
+        :type action: lambda
+        """
+        super(DisposeTask, self).__init__()
+        self.action = action
+
+    def run(self):
+        try:
+            self.action()
+        finally:
+            self.dispose()
+
+    def isDisposed(self):
+        return not self.is_alive()
+
+    def dispose(self):
+        if self.is_alive():
+            self.terminate()
 
 
 class Observable(ObservableSource):
@@ -121,6 +153,20 @@ class Observable(ObservableSource):
 
     def doOnEach(self, on_next, on_error, on_complete, on_after_terminate):
         return ObservableOnEach(self, on_next, on_error, on_complete, on_after_terminate)
+
+    def observeOn(self, process_constructor):
+        """
+        process - lambda 
+        :type process_constructor: mutliprocessing.Process
+        """
+        return ObservableObserveOn(self, process_constructor, False, 42 * 10 * 8)
+
+    def subscribeOn(self, process_constructor):
+        """
+
+        :type process_constructor: multiprocessing.Process
+        """
+        return ObservableSubscribeOn(self, process_constructor)
 
     def toList(self):
         return ObservableToListSingle(self)
@@ -201,7 +247,7 @@ class ObservableCreate(Observable):
             if not self.isDisposed():
                 try:
                     self._observer.onComplete()
-                except:
+                except Exception as err:
                     self.dispose()
 
         def onError(self, err):
@@ -338,8 +384,8 @@ class ObservableFlatMap(Observable, ObservableSource):
                 def onComplete(self):
                     pass
 
-                def onNext(self, t):
-                    self.actual.onNext(t)
+                def onNext(self, _t):
+                    self.actual.onNext(_t)
 
             o = InnerObserver(self.child)
             self._observer = o
@@ -437,3 +483,155 @@ class ObservableToListSingle(Single):
         observer = ObservableToListSingle.ToListObserver(single_observer)
         self.source.subscribe(observer)
         return observer
+
+
+class ObservableObserveOn(Observable, ObservableSource):
+    class ObserveOnObserver(Observer, Disposable, multiprocessing.Process):
+        def __init__(self, actual, delayError, bufferSize):
+            """
+
+            :type actual: Observer
+            """
+            super(ObservableObserveOn.ObserveOnObserver, self).__init__()
+
+            self.actual = actual
+            self.delayError = delayError
+            self.bufferSize = bufferSize
+            self.s = None
+            self.queue = queues.Queue(maxsize=self.bufferSize)
+            self.done = False
+            self.error = None
+            self.canceled = False
+
+        def onSubscribe(self, disposable):
+            self.s = disposable
+            self.actual.onSubscribe(self)
+
+        def onNext(self, t):
+            if self.done:
+                return
+            self.queue.put(t)
+
+        def onError(self, err):
+            self.error = err
+            self.done = True
+
+        def onComplete(self):
+            if self.done:
+                return True
+            self.done = True
+
+        def isDisposed(self):
+            return self.canceled
+
+        def dispose(self):
+            if not self.canceled:
+                self.canceled = True
+                self.s.dispose()
+
+        def run(self):
+            try:
+                while True:
+                    if self.done:
+                        break
+
+                    v = None
+                    try:
+                        v = self.queue.get(timeout=1)
+                    except queues.Empty:
+                        continue
+                    except Exception as err:
+                        log.error("error", exc_info=True)
+                        self.actual.onError(err)
+                        self.dispose()
+                        self.queue.close()
+                        return
+
+                    if self.canceled:
+                        self.queue.close()
+                        return
+                    if self.error:
+                        self.actual.onError(self.error)
+                        self.queue.close()
+                        return
+
+                    if v is None:
+                        self.actual.onComplete()
+                        self.queue.close()
+                        return
+
+                    self.actual.onNext(v)
+            except Exception as err:
+                log.error("meh", exc_info=True)
+                self.error = err
+                self.actual.onError(err)
+                self.dispose()
+                self.queue.close()
+
+    def __init__(self, source, process, delayError, bufferSize):
+        super(ObservableObserveOn, self).__init__(source)
+        self.source = source
+        self.process = process
+        self.delayError = delayError
+        self.bufferSize = bufferSize
+
+    def subscribe(self, observer):
+        isinstance(observer, Observer), "observer must be Observer type not %s" % type(observer)
+        proc = ObservableObserveOn.ObserveOnObserver(observer, self.delayError, self.bufferSize)
+        proc.start()
+        self.source.subscribe(proc)
+
+
+class ObservableSubscribeOn(Observable, ObservableSource):
+    class SubscribeOnObserver(Observer, Disposable):
+        def __init__(self, actual):
+            """
+
+            :type actual: Observer
+            """
+            self.actual = actual
+            self.s = None
+
+        def onError(self, err):
+            self.actual.onError(err)
+
+        def onSubscribe(self, disposable):
+            self.s = disposable
+
+        def onComplete(self):
+            self.actual.onComplete()
+
+        def onNext(self, t):
+            self.actual.onNext(t)
+
+        def isDisposed(self):
+            return self.s is None
+
+        def dispose(self):
+            self.s.dispose()
+            self.s = None
+
+        def setDisposable(self, d):
+            self.s = d
+
+    def __init__(self, source, runnable):
+        """
+
+        :type source: ObservableSource
+        :type runnable: multiprocessing.Process
+        """
+
+        super(ObservableSubscribeOn, self).__init__(source)
+        self.source = source
+        self.runnable = runnable
+
+    def subscribe(self, observer):
+        parent = ObservableSubscribeOn.SubscribeOnObserver(observer)
+        observer.onSubscribe(parent)
+
+        def subscribe_task():
+            self.source.subscribe(parent)
+
+        task = DisposeTask(subscribe_task)
+        parent.setDisposable(task)
+        task.start()
