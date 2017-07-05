@@ -8,4 +8,5 @@ rexpython/helpers.py
 rexpython/observable.py
 rexpython/observers.py
 rexpython/singles.py
+rexpython/test_observable.py
 rexpython/utils.py

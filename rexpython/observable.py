@@ -291,7 +291,7 @@ class ObservableCreate(Observable):
         except Exception as err:
             THROW_IF_FATAL(err)
             exc_info = sys.exc_info()
-            parent.onError(exc_info)
+            parent.onError(exc_info[1])
 
 
 class ObservableMap(Observable, ObservableSource):
@@ -324,7 +324,7 @@ class ObservableMap(Observable, ObservableSource):
                     return self.actual.onNext(self.mapper(t))
                 except Exception as err:
                     self.actual.dispose()
-                    self.actual.onError(err)
+                    self.actual.onError(sys.exc_info()[1])
 
         o = MapObserver(observer, self.func)
         self.source.subscribe(o)
@@ -542,7 +542,7 @@ class ObservableObserveOn(Observable, ObservableSource):
                         continue
                     except Exception as err:
                         log.error("error", exc_info=True)
-                        self.actual.onError(err)
+                        self.actual.onError(sys.exc_info()[1])
                         self.dispose()
                         self.queue.close()
                         return
@@ -564,7 +564,7 @@ class ObservableObserveOn(Observable, ObservableSource):
             except Exception as err:
                 log.error("meh", exc_info=True)
                 self.error = err
-                self.actual.onError(err)
+                self.actual.onError(sys.exc_info()[1])
                 self.dispose()
                 self.queue.close()
 
