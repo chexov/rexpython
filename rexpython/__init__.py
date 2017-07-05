@@ -1,6 +1,11 @@
 import traceback
 from abc import ABCMeta, abstractmethod
 
+from tblib import pickling_support
+
+pickling_support.install()
+from six import reraise
+
 
 def EMPTY_ACTION():
     pass
@@ -12,15 +17,16 @@ def EMPTY_CONSUMER(t):
 
 def ON_ERROR(err):
     if isinstance(err, tuple):
-        raise err[1], None, err[2]
+        reraise(*err)
     else:
         raise err
 
 
 def THROW_IF_FATAL(err):
     if isinstance(err, tuple):
-        traceback.print_exception(*err)
-        # raise err[1], None, err[2]
+        pass
+        # reraise(*err)
+        # traceback.print_exception(*err)
     else:
         pass
         # raise err
@@ -45,7 +51,6 @@ class ActionDisposable(Disposable):
         self.on_dispose = on_dispose
 
     def dispose(self):
-        print "asdsad", self.on_dispose
         if self.on_dispose:
             self.on_dispose()
             self.on_dispose = None

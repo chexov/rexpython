@@ -1,10 +1,9 @@
 import collections
+import logging
 import multiprocessing
 import sys
 from abc import ABCMeta, abstractmethod
 from multiprocessing import queues
-
-import logging
 
 from singles import Single
 from . import Emitter, EMPTY_ACTION, Disposable, EMPTY_CONSUMER, THROW_IF_FATAL
@@ -288,10 +287,9 @@ class ObservableCreate(Observable):
         try:
             self.source.subscribe(parent)
             return observer
-        except Exception as err:
-            THROW_IF_FATAL(err)
-            exc_info = sys.exc_info()
-            parent.onError(exc_info[1])
+        except Exception:
+            # THROW_IF_FATAL(err)
+            parent.onError(sys.exc_info())
 
 
 class ObservableMap(Observable, ObservableSource):
@@ -324,7 +322,7 @@ class ObservableMap(Observable, ObservableSource):
                     return self.actual.onNext(self.mapper(t))
                 except Exception as err:
                     self.actual.dispose()
-                    self.actual.onError(sys.exc_info()[1])
+                    self.actual.onError(sys.exc_info())
 
         o = MapObserver(observer, self.func)
         self.source.subscribe(o)
@@ -542,7 +540,7 @@ class ObservableObserveOn(Observable, ObservableSource):
                         continue
                     except Exception as err:
                         log.error("error", exc_info=True)
-                        self.actual.onError(sys.exc_info()[1])
+                        self.actual.onError(sys.exc_info())
                         self.dispose()
                         self.queue.close()
                         return
@@ -564,7 +562,7 @@ class ObservableObserveOn(Observable, ObservableSource):
             except Exception as err:
                 log.error("meh", exc_info=True)
                 self.error = err
-                self.actual.onError(sys.exc_info()[1])
+                self.actual.onError(sys.exc_info())
                 self.dispose()
                 self.queue.close()
 

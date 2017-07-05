@@ -115,11 +115,11 @@ class BlockingMultiObserver(SingleObserver, CountDownLatch):
         if self.count != 0:
             try:
                 self.await()
-            except Exception as exc:
+            except Exception:
                 exc_info = sys.exc_info()
                 try:
                     self.d.dispose()
-                except Exception as exc:
+                except Exception:
                     THROW_IF_FATAL(sys.exc_info())
                 ON_ERROR(exc_info)
 
