@@ -90,9 +90,11 @@ class DisposeTask(Disposable, multiprocessing.Process):
         """
         super(DisposeTask, self).__init__()
         self.action = action
+        self.__started = False
 
     def run(self):
         try:
+            self.__started = True
             self.action()
         finally:
             self.dispose()
@@ -101,8 +103,9 @@ class DisposeTask(Disposable, multiprocessing.Process):
         return not self.is_alive()
 
     def dispose(self):
-        if self.is_alive():
+        if self.__started and self.is_alive():
             self.terminate()
+            self.__started = False
 
 
 class Observable(ObservableSource):

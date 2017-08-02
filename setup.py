@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='rexpython',
-    version='0.1.8',
+    version='0.1.9',
     author='Anton P. Linevich',
     author_email='anton@linevich.com',
     keywords="rx rxpy rxjava reactive",
